@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,7 @@ type CustomerHandlerTestSuit struct {
 }
 
 func (suite *CustomerHandlerTestSuit) SetupSuite() {
+	fmt.Println("Iniciando Setup")
 	suite.ctx = context.Background()
 	pgContainer, err := testhelpers.CratePostgresContainer(suite.ctx)
 	if err != nil {
@@ -37,13 +39,38 @@ func (suite *CustomerHandlerTestSuit) SetupSuite() {
 	suite.repository = repository
 }
 
+// run before each test
+func (s *CustomerHandlerTestSuit) BeforeTest(suiteName, testName string) {
+	log.Println("BeforeTest()", suiteName, testName)
+}
+
 func (s *CustomerHandlerTestSuit) TearDownSuite() {
+	fmt.Println("Iniciando")
 	if err := s.pgContainer.Terminate(s.ctx); err != nil {
 		log.Fatal()
 	}
+	fmt.Println("Encerrando")
 }
 
 func (s *CustomerHandlerTestSuit) TestCreateCustomer() {
+	t := s.T()
+
+	createUseCase := usecase.NewCreateCustomerUseCase(s.repository)
+
+	payload := `{"name":"Jon Snow", "email": "email@mail.com"}`
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(payload))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	h := NewCreateCustomerUseCase(createUseCase)
+	if assert.NoError(t, h.Execute(c)) {
+		assert.Equal(t, http.StatusCreated, rec.Code)
+	}
+
+}
+
+func (s *CustomerHandlerTestSuit) TestCreateCustomerDuplicateEmail() {
 	t := s.T()
 
 	createUseCase := usecase.NewCreateCustomerUseCase(s.repository)
