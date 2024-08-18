@@ -1,7 +1,7 @@
 package customer
 
 type Customer struct {
-	Id    int
-	Name  string
-	Email string
+	Id    int    `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
