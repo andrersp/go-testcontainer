@@ -15,11 +15,11 @@ type PostgresContainer struct {
 	ConnectionString string
 }
 
-func CratePostgresContainer() (*PostgresContainer, error) {
-	ctx := context.Background()
+func CratePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
+
 	pgContainer, err := postgres.Run(
 		ctx, "postgres:10-alpine",
-		postgres.WithInitScripts(filepath.Join("..", "testdata", "init-db.sql")),
+		postgres.WithInitScripts(filepath.Join("..", "testhelpers", "sql", "init-db.sql")),
 		postgres.WithDatabase("test-data"),
 		postgres.WithUsername("postgres"),
 		postgres.WithPassword("postgres"),
