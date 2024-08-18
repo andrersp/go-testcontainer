@@ -19,7 +19,8 @@ func (c *createCustomerHandlers) Execute(e echo.Context) error {
 	}
 	response, err := c.useCase.Execute(payload)
 	if err != nil {
-		return err
+
+		return e.JSON(400, err)
 	}
 
 	return e.JSON(http.StatusCreated, response)
