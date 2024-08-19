@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,50 +14,83 @@ import (
 	"github.com/andrersp/test-containers/usecase"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestCreaCustomer(t *testing.T) {
+type CustomerHandlerTestSuit struct {
+	suite.Suite
+	pgContainer *testhelpers.PostgresContainer
+	repository  *repository.Repository
+	ctx         context.Context
+}
 
-	ctx := context.Background()
-	pgContainer, err := testhelpers.CratePostgresContainer(ctx)
-	assert.NoError(t, err)
-	customerRepository, err := repository.NewRepository(ctx, pgContainer.ConnectionString)
-	assert.NoError(t, err)
-	crateUseCase := usecase.NewCreateCustomerUseCase(customerRepository)
+func (suite *CustomerHandlerTestSuit) SetupTest() {
+	fmt.Println("Iniciando Setup")
+	suite.ctx = context.Background()
+	pgContainer, err := testhelpers.CratePostgresContainer(suite.ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	suite.pgContainer = pgContainer
+	repository, err := repository.NewRepository(suite.ctx, suite.pgContainer.ConnectionString)
+	if err != nil {
+		log.Fatal(err)
+	}
+	suite.repository = repository
+}
+
+func (s *CustomerHandlerTestSuit) TearDownTest() {
+	fmt.Println("Iniciando")
+	if err := s.pgContainer.Terminate(s.ctx); err != nil {
+		log.Fatal()
+	}
+	fmt.Println("Encerrando")
+}
+
+func (s *CustomerHandlerTestSuit) TestCreateCustomer() {
+	t := s.T()
+
+	createUseCase := usecase.NewCreateCustomerUseCase(s.repository)
 
 	payload := `{"name":"Jon Snow", "email": "email@mail.com"}`
-
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(payload))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	h := NewCreateCustomerUseCase(crateUseCase)
+	h := NewCreateCustomerUseCase(createUseCase)
 	if assert.NoError(t, h.Execute(c)) {
 		assert.Equal(t, http.StatusCreated, rec.Code)
 	}
 
 }
 
-func TestCreaCustomerDuplicate(t *testing.T) {
+func (s *CustomerHandlerTestSuit) TestCreateCustomerDuplicateEmail() {
+	t := s.T()
 
-	ctx := context.Background()
-	pgContainer, err := testhelpers.CratePostgresContainer(ctx)
-	assert.NoError(t, err)
-	customerRepository, err := repository.NewRepository(ctx, pgContainer.ConnectionString)
-	assert.NoError(t, err)
-	crateUseCase := usecase.NewCreateCustomerUseCase(customerRepository)
+	createUseCase := usecase.NewCreateCustomerUseCase(s.repository)
 
 	payload := `{"name":"Jon Snow", "email": "john@gmail.com"}`
-
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(payload))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	h := NewCreateCustomerUseCase(crateUseCase)
+	h := NewCreateCustomerUseCase(createUseCase)
 	if assert.NoError(t, h.Execute(c)) {
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	}
 
+}
+
+func (s *CustomerHandlerTestSuit) TestGetCustomer() {
+	t := s.T()
+
+	result, err := s.repository.GetCustomerByEmail(s.ctx, "john@gmail.com")
+	assert.NoError(t, err)
+	assert.Equal(t, "John", result.Name)
+}
+
+func TestCustomerHandlerTestSuit(t *testing.T) {
+	suite.Run(t, new(CustomerHandlerTestSuit))
 }
